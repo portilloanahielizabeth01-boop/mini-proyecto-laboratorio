@@ -26,6 +26,7 @@ require_once __DIR__ . '/../src/Pricing/PricingStrategy.php';
 require_once __DIR__ . '/../src/Pricing/PrivatePatientStrategy.php';
 require_once __DIR__ . '/../src/Pricing/InsuranceStrategy.php';
 require_once __DIR__ . '/../src/Pricing/RetireeStrategy.php';
+require_once __DIR__ . '/../src/Pricing/PrepaidStrategy.php';
 require_once __DIR__ . '/../src/Pricing/PriceCalculator.php';
 require_once __DIR__ . '/../src/Notifications/EmailNotification.php';
 require_once __DIR__ . '/../src/Notifications/SmsNotification.php';
