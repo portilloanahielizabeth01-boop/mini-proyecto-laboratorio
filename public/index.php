@@ -19,30 +19,14 @@
  * ============================================================================
  */
 
-// ❌ MAL APLICADO: carga manual. Cada clase nueva obliga a editar este archivo.
-require_once __DIR__ . '/../src/Database/Connection.php';
-require_once __DIR__ . '/../src/Models/Order.php';
-require_once __DIR__ . '/../src/Pricing/PricingStrategy.php';
-require_once __DIR__ . '/../src/Pricing/PriceCalculator.php';
-require_once __DIR__ . '/../src/Notifications/EmailNotification.php';
-require_once __DIR__ . '/../src/Notifications/SmsNotification.php';
-require_once __DIR__ . '/../src/Notifications/NotificationSender.php';
-require_once __DIR__ . '/../src/Legacy/LegacyNotifier.php';
-require_once __DIR__ . '/../src/Reports/ReportGenerator.php';
-require_once __DIR__ . '/../src/Events/OrderEvents.php';
-require_once __DIR__ . '/../src/Services/OrderService.php';
-require_once __DIR__ . '/../src/Controllers/OrderController.php';
-
-/*
- * ✅ FORMA CORRECTA (reemplaza a los 11 require de arriba):
- *
- * spl_autoload_register(function (string $class): void {
- *     $file = __DIR__ . '/../src/' . str_replace('\\', '/', $class) . '.php';
- *     if (is_file($file)) {
- *         require_once $file;
- *     }
- * });
- */
+// Autoload: PHP busca la clase en src/<Carpeta>/<Clase>.php la primera vez que
+// se usa. Agregar una clase nueva ya no obliga a editar este archivo.
+spl_autoload_register(function (string $clase): void {
+    foreach (glob(__DIR__ . '/../src/*/' . $clase . '.php') as $archivo) {
+        require_once $archivo;
+        return;
+    }
+});
 
 // ❌ MAL APLICADO: credenciales en el código fuente y dentro del repositorio.
 //    Si el repo es público, la credencial es pública.
