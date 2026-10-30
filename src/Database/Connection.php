@@ -1,79 +1,57 @@
 <?php
-/**
- * ============================================================================
- *  CONEXION A LA BASE DE DATOS
- *  Patron esperado: SINGLETON (creacional)
- * ============================================================================
- *
- *  ❌ DEUDA SEMBRADA
- *     1. obtener() crea una conexion NUEVA en cada llamada.
- *     2. Las credenciales llegan por constantes globales definidas en index.php.
- *     3. La excepcion se traga en silencio y el sistema sigue como si nada.
- *
- *  ✅ FORMA CORRECTA
- *     1. Singleton: constructor privado + instancia estatica + getInstance().
- *     2. La configuracion se inyecta, no se lee de constantes globales.
- *     3. Si la conexion falla, el error se propaga: fallar rapido y fuerte.
- *
- *  ⚠️ Advertencia de la clase: Singleton sirve para conexion, logger y
- *     configuracion. NO para guardar el pedido actual ni el usuario logueado.
- *     Ahi deja de ser un patron y pasa a ser una variable global disfrazada.
- * ============================================================================
- */
 
-class Connection
-{
-    /** Almacen en memoria para poder correr la demo sin MySQL levantado. */
-    private static array $tablaEnMemoria = [];
+namespace App\Database;
 
-    /**
-     * ❌ METODO MAL APLICADO: obtener()
-     *    Devuelve una instancia nueva cada vez que se lo llama.
-     *    Con 40 consultas por request, el sistema abre 40 conexiones.
-     */
-    public static function obtener(): Connection
-    {
-        return new Connection();
-    }
+use PDO;
+use PDOException;
 
-    /*
-     * ✅ FORMA CORRECTA — Singleton:
-     *
-     * private static ?Connection $instance = null;
-     *
-     * private function __construct(private PDO $pdo) {}
-     *
-     * public static function getInstance(array $config): Connection
-     * {
-     *     if (self::$instance === null) {
-     *         $dsn = "mysql:host={$config['host']};dbname={$config['name']};charset=utf8mb4";
-     *         self::$instance = new Connection(
-     *             new PDO($dsn, $config['user'], $config['pass'], [
-     *                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-     *             ])
-     *         );
-     *     }
-     *     return self::$instance;
-     * }
-     *
-     * Ejercicio: por que el constructor tiene que ser private?
-     * Respuesta: para que nadie pueda hacer new Connection() desde afuera
-     * y romper la garantia de instancia unica.
-     */
+class Connection {
+    // Instancia única de la clase (Patrón Singleton)
+    private static ?Connection $instance = null;
+    private ?PDO $connection = null;
 
-    public function ejecutar(string $sql): void
-    {
+    // Configuración de la base de datos (puedes adaptarla según tu entorno)
+    private string $host = 'localhost';
+    private string $db   = 'laboratorio_pedidos';
+    private string $user = 'root';
+    private string $pass = '';
+    private string $charset = 'utf8mb4';
+
+    // Constructor privado para evitar que se instancie externamente con `new Connection()`
+    private function __construct() {
+        $dsn = "mysql:host={$this->host};dbname={$this->db};charset={$this->charset}";
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // No silenciar errores, lanzarlos
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+
         try {
-            self::$tablaEnMemoria[] = $sql;
-        } catch (Throwable $e) {
-            // ❌ MAL APLICADO: la excepcion se traga y el sistema sigue.
-            //    El pedido "se guardo" aunque no se guardo nada.
-            //    ✅ Loguear y relanzar: throw new RuntimeException('...', 0, $e);
+            $this->connection = new PDO($dsn, $this->user, $this->pass, $options);
+        } catch (PDOException $e) {
+            // Manejo adecuado de la excepción de conexión sin silenciarla
+            throw new PDOException("Error de conexión a la base de datos: " . $e->getMessage(), (int)$e->getCode());
         }
     }
 
-    public function consultas(): array
-    {
-        return self::$tablaEnMemoria;
+    // Método estático global para obtener la única instancia de la clase
+    public static function getInstance(): self {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    // Método para obtener el objeto PDO y realizar consultas
+    public function getConnection(): PDO {
+        return $this->connection;
+    }
+
+    // Prevenir la clonación de la instancia
+    private function __clone() {}
+
+    // Prevenir la deserialización de la instancia
+    public function __wakeup() {
+        throw new \Exception("No se puede unserialize una instancia de Singleton.");
     }
 }
