@@ -2,90 +2,94 @@
 /**
  * ============================================================================
  *  AVISOS AL CREARSE UN PEDIDO
- *  Patron esperado: OBSERVER (comportamiento)
- * ============================================================================
- *
- *  ❌ DEUDA SEMBRADA
- *     Quien crea el pedido llama a mano a cada interesado, uno por uno.
- *     Sumar un aviso nuevo (auditoria, WhatsApp, dashboard) obliga a modificar
- *     esta clase Y todos los lugares que la usan.
- *     Si un aviso falla, se corta la cadena y los siguientes no se ejecutan.
- *
- *  ✅ FORMA CORRECTA
- *     Un sujeto que mantiene una coleccion de observadores y les avisa.
- *     El sujeto conoce la interfaz, no las clases concretas.
+ *  Patrón aplicado: OBSERVER (comportamiento)
  * ============================================================================
  */
 
-class OrderEvents
+/**
+ * 1. Contrato común para todos los observadores (la interfaz que conoce el sujeto).
+ */
+interface OrderObserver
 {
-    /**
-     * ❌ METODO MAL APLICADO: pedidoCreado()
-     *    Acoplamiento fuerte con TRES clases concretas.
-     *    Viola OCP y ademas viola Inversion de Dependencias:
-     *    la clase de alto nivel depende de detalles de bajo nivel.
-     */
-    public function pedidoCreado(Order $order): void
+    public function update(Order $order): void;
+}
+
+/**
+ * 2. Observador concreto para Emails.
+ */
+final class EmailObserver implements OrderObserver
+{
+    public function __construct(private EmailNotification $emailNotification) {}
+
+    public function update(Order $order): void
     {
-        // ❌ llamadas directas y encadenadas
-        $email = new EmailNotification();
-        $email->enviarEmail('paciente@mail.com', 'Pedido creado', "Pedido {$order->id}");
+        $this->emailNotification->enviarEmail(
+            'paciente@mail.com',
+            'Pedido creado',
+            "Pedido {$order->id}"
+        );
+    }
+}
 
-        $sms = new SmsNotification();
-        $sms->mandarSms('3704000000', "Pedido {$order->id} creado");
+/**
+ * 3. Observador concreto para SMS (Ejercicio 5: agregado sin tocar el sujeto).
+ */
+final class SmsObserver implements OrderObserver
+{
+    public function __construct(private SmsNotification $smsNotification) {}
 
-        // ❌ Si esta linea lanza una excepcion, el mail ya salio pero el
-        //    dashboard nunca se entera. Estado inconsistente y silencioso.
+    public function update(Order $order): void
+    {
+        $this->smsNotification->mandarSms(
+            '3704000000',
+            "Pedido {$order->id} creado"
+        );
+    }
+}
+
+/**
+ * 4. Observador concreto para Dashboard.
+ */
+final class DashboardObserver implements OrderObserver
+{
+    public function update(Order $order): void
+    {
         echo "[DASHBOARD] actualizado para el pedido {$order->id}<br>";
+    }
+}
+
+/**
+ * 5. El Sujeto (Subject): mantiene la colección de interfaces y notifica.
+ */
+final class OrderSubject
+{
+    /** @var OrderObserver[] Colección de interfaces, no de clases concretas */
+    private array $observers = [];
+
+    public function subscribe(OrderObserver $observer): void
+    {
+        $this->observers[] = $observer;
+    }
+
+    public function notify(Order $order): void
+    {
+        foreach ($this->observers as $observer) {
+            $observer->update($order); // POLIMORFISMO puro
+        }
     }
 }
 
 /*
  * ============================================================================
- *  ✅ FORMA CORRECTA — OBSERVER
- * ============================================================================
- *
- * interface OrderObserver
- * {
- *     public function update(Order $order): void;
- * }
- *
- * final class EmailObserver implements OrderObserver
- * {
- *     public function update(Order $order): void
- *     {
- *         echo "Email enviado para el pedido {$order->id}";
- *     }
- * }
- *
- * final class OrderSubject
- * {
- *     private array $observers = [];   // coleccion de INTERFACES, no de clases
- *
- *     public function subscribe(OrderObserver $observer): void
- *     {
- *         $this->observers[] = $observer;
- *     }
- *
- *     public function notify(Order $order): void
- *     {
- *         foreach ($this->observers as $observer) {
- *             $observer->update($order);   // POLIMORFISMO
- *         }
- *     }
- * }
- *
- * Uso:
- *   $subject = new OrderSubject();
- *   $subject->subscribe(new EmailObserver());
- *   $subject->subscribe(new DashboardObserver());
- *   $subject->notify($order);
- *
- * ----------------------------------------------------------------------------
- * EJERCICIO 5 (TP): agregar SmsObserver sin tocar OrderSubject.
- *
- * CONSECUENCIA A JUSTIFICAR EN EL PR: con Observer, leyendo el codigo del
- * pedido ya NO se ve quien se entera del evento. Ganamos desacoplamiento y
- * perdimos trazabilidad. Como lo compensan? (log, nombres explicitos, tests)
+ *  EJEMPLO DE USO
  * ============================================================================
  */
+
+// Se inicializa el sujeto y se suscriben dinámicamente los observadores
+$subject = new OrderSubject();
+$subject->subscribe(new EmailObserver(new EmailNotification()));
+$subject->subscribe(new SmsObserver(new SmsNotification()));
+$subject->subscribe(new DashboardObserver());
+
+// Al crear el pedido, se notifica a todos los subscritos de forma desacoplada
+// $subject->notify($order);
