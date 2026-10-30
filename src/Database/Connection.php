@@ -2,69 +2,62 @@
 /**
  * ============================================================================
  *  CONEXION A LA BASE DE DATOS
- *  Patron esperado: SINGLETON (creacional)
+ *  Patron aplicado: SINGLETON (creacional)
  * ============================================================================
  *
- *  ❌ DEUDA SEMBRADA
- *     1. obtener() crea una conexion NUEVA en cada llamada.
- *     2. Las credenciales llegan por constantes globales definidas en index.php.
- *     3. La excepcion se traga en silencio y el sistema sigue como si nada.
+ *  1. Hay UNA sola conexion por request: constructor privado + instancia
+ *     estatica + getInstance().
+ *  2. La configuracion se inyecta una vez desde public/index.php; ya no se
+ *     leen constantes globales.
  *
- *  ✅ FORMA CORRECTA
- *     1. Singleton: constructor privado + instancia estatica + getInstance().
- *     2. La configuracion se inyecta, no se lee de constantes globales.
- *     3. Si la conexion falla, el error se propaga: fallar rapido y fuerte.
+ *  ⚠️ Singleton sirve para conexion, logger y configuracion. NO para guardar
+ *     el pedido actual ni el usuario logueado: eso seria una variable global
+ *     disfrazada.
  *
- *  ⚠️ Advertencia de la clase: Singleton sirve para conexion, logger y
- *     configuracion. NO para guardar el pedido actual ni el usuario logueado.
- *     Ahi deja de ser un patron y pasa a ser una variable global disfrazada.
+ *  La persistencia sigue simulada en memoria (no es parte de la deuda).
  * ============================================================================
  */
 
-class Connection
+final class Connection
 {
-    /** Almacen en memoria para poder correr la demo sin MySQL levantado. */
-    private static array $tablaEnMemoria = [];
+    private static ?Connection $instance = null;
 
-    /**
-     * ❌ METODO MAL APLICADO: obtener()
-     *    Devuelve una instancia nueva cada vez que se lo llama.
-     *    Con 40 consultas por request, el sistema abre 40 conexiones.
-     */
-    public static function obtener(): Connection
+    /** Almacen en memoria para poder correr la demo sin MySQL levantado. */
+    private array $consultasEjecutadas = [];
+
+    // Privado: nadie puede hacer new Connection() desde afuera y romper
+    // la garantia de instancia unica.
+    private function __construct(private array $config)
     {
-        return new Connection();
     }
 
-    /*
-     * ✅ FORMA CORRECTA — Singleton:
-     *
-     * private static ?Connection $instance = null;
-     *
-     * private function __construct(private PDO $pdo) {}
-     *
-     * public static function getInstance(array $config): Connection
-     * {
-     *     if (self::$instance === null) {
-     *         $dsn = "mysql:host={$config['host']};dbname={$config['name']};charset=utf8mb4";
-     *         self::$instance = new Connection(
-     *             new PDO($dsn, $config['user'], $config['pass'], [
-     *                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-     *             ])
-     *         );
-     *     }
-     *     return self::$instance;
-     * }
-     *
-     * Ejercicio: por que el constructor tiene que ser private?
-     * Respuesta: para que nadie pueda hacer new Connection() desde afuera
-     * y romper la garantia de instancia unica.
+    /**
+     * La primera llamada (en index.php) recibe la configuracion y crea la
+     * conexion. Las siguientes devuelven siempre la misma instancia.
      */
+    public static function getInstance(?array $config = null): Connection
+    {
+        if (self::$instance === null) {
+            if ($config === null) {
+                throw new RuntimeException(
+                    'La conexion no fue inicializada: llamar primero a Connection::getInstance($config).'
+                );
+            }
+            self::$instance = new Connection($config);
+        }
+
+        return self::$instance;
+    }
+
+    // Tampoco se puede clonar: seria una segunda instancia.
+    private function __clone()
+    {
+    }
 
     public function ejecutar(string $sql): void
     {
         try {
-            self::$tablaEnMemoria[] = $sql;
+            $this->consultasEjecutadas[] = $sql;
         } catch (Throwable $e) {
             // ❌ MAL APLICADO: la excepcion se traga y el sistema sigue.
             //    El pedido "se guardo" aunque no se guardo nada.
@@ -74,6 +67,6 @@ class Connection
 
     public function consultas(): array
     {
-        return self::$tablaEnMemoria;
+        return $this->consultasEjecutadas;
     }
 }
