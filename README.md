@@ -1,7 +1,9 @@
 # laboratorio-pedidos — proyecto de práctica
 
+[![CI](https://github.com/portilloanahielizabeth01-boop/mini-proyecto-laboratorio/actions/workflows/ci.yml/badge.svg)](https://github.com/portilloanahielizabeth01-boop/mini-proyecto-laboratorio/actions/workflows/ci.yml)
+
 Sistema de gestión de pedidos de un laboratorio de análisis clínicos.
-**PHP Vanilla, sin frameworks, sin Composer.** Corre en XAMPP tal cual está.
+**PHP sin frameworks.** Corre en XAMPP; Composer se usa para el autoload y las herramientas de prueba.
 
 > ⚠️ **Este proyecto está roto a propósito.**
 > Cada archivo contiene deuda técnica sembrada, marcada con comentarios:
@@ -19,16 +21,45 @@ Sistema de gestión de pedidos de un laboratorio de análisis clínicos.
 ## Cómo levantarlo
 
 1. Copiar la carpeta dentro de `C:\xampp\htdocs\`.
-2. Iniciar Apache desde el panel de XAMPP (MySQL **no** hace falta).
-3. Abrir: `http://localhost/mini-proyecto-laboratorio/public/index.php`
+2. (Recomendado) En la carpeta del proyecto, correr `composer install`.
+   Si no tenés Composer, igual funciona: `public/index.php` trae un autoloader
+   de respaldo.
+3. (Opcional) Copiar `config/database.example.php` como `config/database.php`
+   y completar las credenciales. Ese archivo no se sube al repositorio.
+4. Iniciar Apache desde el panel de XAMPP (MySQL **no** hace falta).
+5. Abrir: `http://localhost/mini-proyecto-laboratorio/public/index.php`
 
 Acciones disponibles:
 
 | URL | Qué hace |
 |---|---|
-| `public/index.php?accion=crear` | Crea un pedido pasando por toda la deuda |
-| `public/index.php?accion=listar` | Lista pedidos desde la vista |
-| `public/index.php?accion=reporte` | Genera un reporte con banderas booleanas |
+| `public/index.php?accion=crear` | Crea un pedido (acepta `id`, `paciente`, `monto`, `tipo`) |
+| `public/index.php?accion=listar` | Lista los pedidos |
+| `public/index.php?accion=reporte` | Genera el reporte del día con firma, PDF y marca de agua |
+
+---
+
+## Pruebas e integración continua (IE3)
+
+| Qué | Herramienta | Dónde |
+|---|---|---|
+| Pruebas unitarias y de integración | **PHPUnit 11** | `tests/` (configuración en `phpunit.xml`) |
+| Casos de prueba documentados | Markdown | [`docs/casos-de-prueba.md`](docs/casos-de-prueba.md) |
+| Lint de sintaxis | `php -l` | paso del workflow |
+| Lint de estándares (PSR-12) | **PHP_CodeSniffer** (`phpcs`) | `phpcs.xml` |
+| Integración continua | **GitHub Actions** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+
+Correr todo en tu máquina:
+
+```bash
+composer install       # instala PHPUnit y phpcs en vendor/
+vendor/bin/phpcs       # lint: revisa el estilo PSR-12
+vendor/bin/phpunit     # ejecuta los 40 casos de prueba
+```
+
+El workflow **CI** se ejecuta solo en cada `push` y en cada Pull Request, con
+PHP 8.2 y 8.3: instala dependencias, corre el lint y ejecuta las pruebas. Si
+algo falla, el commit o el PR queda marcado con ❌.
 
 La persistencia está simulada en memoria para que el proyecto arranque sin
 configurar MySQL. Eso **no** es parte de la deuda a corregir.
