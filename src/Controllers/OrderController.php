@@ -1,23 +1,80 @@
 <?php
 
-namespace Src\Services;
+declare(strict_types=1);
 
-use Src\Models\Order;
+namespace App\Controllers;
 
-final class OrdersService // o OrderFacade según prefieras mantener el nombre de la clase del archivo
+use App\Models\Order;
+use App\Reports\BasicReport;
+use App\Reports\DigitalSignatureDecorator;
+use App\Reports\PdfReportDecorator;
+use App\Reports\WatermarkDecorator;
+use App\Services\OrderService;
+
+/**
+ * ============================================================================
+ *  CONTROLADOR DE PEDIDOS
+ *  Patrón aplicado: MVC + SRP
+ * ============================================================================
+ *
+ *  Antes el controlador armaba SQL, calculaba descuentos, decidía qué
+ *  notificación mandar e imprimía HTML con echo.
+ *
+ *  Ahora solo: 1) recibe la entrada, 2) llama al servicio,
+ *  3) elige qué vista mostrar. No tiene SQL, ni reglas de negocio, ni HTML.
+ * ============================================================================
+ */
+final class OrderController
 {
     public function __construct(
-        private $validator,
-        private $calculator,
-        private $repository,
-        private $events
-    ) {}
+        private OrderService $service,
+        private string $viewsPath
+    ) {
+    }
 
-    public function createOrder(Order $order): void
+    /**
+     * @param array<string, string> $input normalmente $_GET
+     */
+    public function create(array $input): string
     {
-        $this->validator->validate($order);
-        $total = $this->calculator->calculate($order->amount);
-        $this->repository->save($order);
-        $this->events->notify($order);
+        $order = new Order(
+            (int) ($input['id'] ?? 1),
+            (string) ($input['paciente'] ?? 'Juan Perez'),
+            (float) ($input['monto'] ?? 15000),
+            (string) ($input['tipo'] ?? 'obra_social')
+        );
+        $total = $this->service->createOrder($order);
+
+        return $this->render('order-created', ['pedido' => $order, 'total' => $total]);
+    }
+
+    public function index(): string
+    {
+        return $this->render('orders', ['pedidos' => $this->service->listOrders()]);
+    }
+
+    public function report(): string
+    {
+        $reporte = new WatermarkDecorator(
+            new PdfReportDecorator(
+                new DigitalSignatureDecorator(
+                    new BasicReport('Pedidos del dia')
+                )
+            )
+        );
+
+        return $this->render('report', ['reporte' => $reporte->generate()]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function render(string $view, array $data): string
+    {
+        extract($data);
+        ob_start();
+        require $this->viewsPath . "/{$view}.php";
+
+        return (string) ob_get_clean();
     }
 }

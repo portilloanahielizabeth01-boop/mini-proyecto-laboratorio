@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Pricing;
+
+/**
+ * Paciente jubilado: 50% de descuento.
+ */
+final class RetireeStrategy implements PricingStrategy
+{
+    public function __construct(private float $discount = 0.50)
+    {
+    }
+
+    public function calculate(float $amount): float
+    {
+        return $amount * (1 - $this->discount);
+    }
+}

@@ -1,39 +1,50 @@
 <?php
 
 /**
- * Punto de entrada único de la aplicación (Front Controller)
- * Refactorizado aplicando Autoload, Configuración Externa y Tabla de Rutas.
+ * ============================================================================
+ *  laboratorio-pedidos — PUNTO DE ENTRADA (Front Controller)
+ *  Refactorizado con: Autoload + configuración externa + tabla de rutas.
+ * ============================================================================
  */
 
-// 1. Cargar el autoloader de Composer (Autoloading automático)
-require_once __DIR__ . '/../vendor/autoload.php';
+declare(strict_types=1);
 
-// 2. Cargar configuración externa (credenciales y parámetros)
-$config = require_once __DIR__ . '/../config/config.php';
-
-// 3. Obtener la ruta solicitada desde la URL (ej. ?route=home o manejo básico de URI)
-$route = $_GET['route'] ?? 'home';
-
-// 4. Definición de la Tabla de Rutas (Mapeo limpio de URLs a Controladores)
-$routes = [
-    'home'       => [App\Controllers\OrderController::class, 'index'],
-    'orders'     => [App\Controllers\OrderController::class, 'list'],
-    'orders/create' => [App\Controllers\OrderController::class, 'create'],
-    'report'     => [App\Controllers\ReportController::class, 'generate'],
-];
-
-// 5. Despachador de rutas (Dispatcher) en lugar de IFs encadenados
-if (array_key_exists($route, $routes)) {
-    [$controllerClass, $action] = $routes[$route];
-    
-    if (class_exists($controllerClass) && method_exists($controllerClass, $action)) {
-        $controller = new $controllerClass();
-        $controller->$action();
-    } else {
-        http_response_code(500);
-        echo "Error 500: El controlador o la acción configurados no existen.";
-    }
+// 1. Autoload: si se corrió `composer install` se usa el de Composer (PSR-4).
+//    Si no (XAMPP sin Composer), un autoloader mínimo con la misma regla:
+//    App\Algo\Clase  =>  src/Algo/Clase.php
+$composer = __DIR__ . '/../vendor/autoload.php';
+if (is_file($composer)) {
+    require_once $composer;
 } else {
+    spl_autoload_register(function (string $class): void {
+        $prefix = 'App\\';
+        if (strncmp($class, $prefix, strlen($prefix)) !== 0) {
+            return;
+        }
+        $file = __DIR__ . '/../src/' . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+        if (is_file($file)) {
+            require_once $file;
+        }
+    });
+}
+
+// 2. Configuración externa: config/database.php NO se versiona (.gitignore).
+//    Si no existe, se usa la plantilla config/database.example.php.
+$configFile = __DIR__ . '/../config/database.php';
+$config = require (is_file($configFile) ? $configFile : __DIR__ . '/../config/database.example.php');
+
+// 3. Tabla de rutas (ver src/Bootstrap.php): reemplaza los if encadenados.
+$router = App\Bootstrap::router($config, __DIR__ . '/../views');
+
+$accion = (string) ($_GET['accion'] ?? 'crear');
+if (!$router->has($accion)) {
     http_response_code(404);
-    echo "Error 404: Página no encontrada.";
+}
+
+try {
+    echo $router->dispatch($accion);
+} catch (InvalidArgumentException $error) {
+    // Datos inválidos (monto <= 0, tipo de paciente desconocido...): se informa, no se oculta.
+    http_response_code(400);
+    echo 'Error: ' . htmlspecialchars($error->getMessage(), ENT_QUOTES, 'UTF-8');
 }

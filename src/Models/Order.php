@@ -1,22 +1,36 @@
 <?php
 
-class Order
-{
-    public readonly int $id;
-    public readonly string $patient;
-    public readonly float $amount;
-    public readonly string $patientType;
+declare(strict_types=1);
 
-    public function __construct(int $id, string $patient, float $amount, string $patientType)
-    {
-        // Validaciones básicas opcionales para evitar que nazca inválido
+namespace App\Models;
+
+use InvalidArgumentException;
+
+/**
+ * ============================================================================
+ *  MODELO Order
+ * ============================================================================
+ *
+ *  - Propiedades readonly: una vez creado, el pedido no se puede modificar.
+ *  - Se valida en el constructor: el objeto no puede nacer inválido.
+ *  - Ya NO se guarda a sí mismo (eso es de OrderRepository) ni calcula
+ *    precios (eso es de las PricingStrategy).
+ * ============================================================================
+ */
+final class Order
+{
+    public function __construct(
+        public readonly int $id,
+        public readonly string $patient,
+        public readonly float $amount,
+        public readonly string $patientType
+    ) {
         if ($amount < 0) {
-            throw new InvalidArgumentException("El monto no puede ser negativo.");
+            throw new InvalidArgumentException('El monto no puede ser negativo.');
         }
 
-        $this->id = $id;
-        $this->patient = $patient;
-        $this->amount = $amount;
-        $this->patientType = $patientType;
+        if (trim($patient) === '') {
+            throw new InvalidArgumentException('El paciente es obligatorio.');
+        }
     }
 }
