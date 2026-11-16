@@ -1,0 +1,61 @@
+# ============================================================================
+#  Integración Continua (CI) — laboratorio-pedidos
+#
+#  Se dispara en cada push y en cada Pull Request (trigger).
+#  Un solo job "test" que corre en paralelo con PHP 8.2 (XAMPP) y 8.3.
+#  Pasos, de lo más rápido a lo más lento ("fail fast"):
+#    1. Descargar el código           (checkout)
+#    2. Instalar PHP                   (setup-php)
+#    3. Instalar dependencias          (composer install)
+#    4. Lint de sintaxis               (php -l en todos los .php)
+#    5. Lint de estándares (PSR-12)    (phpcs)
+#    6. Pruebas unitarias e integración(phpunit)
+#  Si un paso falla, el workflow queda en rojo y el PR muestra la ❌.
+# ============================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Pruebas (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3']
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Validar composer.json
+        run: composer validate --no-check-publish
+
+      - name: Cachear dependencias de Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.json') }}
+
+      - name: Instalar dependencias
+        run: composer install --no-progress --no-interaction --prefer-dist
+
+      - name: Lint de sintaxis (php -l)
+        run: find src tests public views config -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Lint de estándares PSR-12 (phpcs)
+        run: vendor/bin/phpcs
+
+      - name: Pruebas (PHPUnit)
+        run: vendor/bin/phpunit
